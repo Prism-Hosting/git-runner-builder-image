@@ -18,3 +18,4 @@ on:
 jobs:
   build:
     uses: Prism-Hosting/git-workflows/.github/workflows/docker-build.yml@main
+    secrets: inherit
