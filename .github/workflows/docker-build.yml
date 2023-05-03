@@ -32,7 +32,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: thisisnttheway/${GITHUB_REPOSITORY#*/}
+        images: thisisnttheway/${{ github.event.repository.name }}
         tags: |
           # set latest tag for default branch
           type=raw,value=latest
