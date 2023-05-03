@@ -16,4 +16,5 @@ RUN mv kubectl /usr/local/bin
 
 WORKDIR /
 
-USER $UID
+# OCP friendly
+USER 1001
