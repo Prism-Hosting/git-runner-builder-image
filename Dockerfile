@@ -1,67 +1,27 @@
-FROM ubuntu
+FROM ubuntu:23.04
 
-USER root
+# Environment and labels
+ENV RUNNER_VERSION=2.303.0
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Tooling
-RUN apt update
-RUN apt install -y \
-  curl \
-  wget \
-  podman \
-  jq
+LABEL RUNNER_VERSION=${RUNNER_VERSION}
 
-# Get oc bin
-WORKDIR /tmp
-RUN wget -qO- https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xvzf -
+# Packages, users
+RUN apt-get update -y && apt-get upgrade -y && useradd -m docker
+RUN apt-get install -y --no-install-recommends \
+    curl wget unzip vim git jq podman build-essential libssl-dev libffi-dev python3 python3-venv python3-dev python3-pip
 
-RUN mv oc /usr/local/bin
-RUN mv kubectl /usr/local/bin
+# Install actions runner
+RUN cd /home/docker && mkdir actions-runner && cd actions-runner \
+    && curl -O -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz \
+    && tar xzf ./actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
 
-WORKDIR /
+# Install deps
+RUN chown -R docker ~docker && /home/docker/actions-runner/bin/installdependencies.sh
 
-# User stuff
-ENV UID=1000
-ENV GID=0
-ENV USERNAME="runner"
-
-# Create our user and their home directory
-RUN useradd -m $USERNAME -u $UID
-# This is to mimic the OpenShift behaviour of adding the dynamic user to group 0.
-RUN usermod -G 0 $USERNAME
-ENV HOME /home/${USERNAME}
-WORKDIR /home/${USERNAME}
-
-# Override these when creating the container.
-ENV GITHUB_PAT ""
-ENV GITHUB_APP_ID ""
-ENV GITHUB_APP_INSTALL_ID ""
-ENV GITHUB_APP_PEM ""
-ENV GITHUB_OWNER ""
-ENV GITHUB_REPOSITORY ""
-ENV RUNNER_WORKDIR /home/${USERNAME}/_work
-ENV RUNNER_GROUP ""
-ENV RUNNER_LABELS ""
-ENV EPHEMERAL ""
-
-# Allow group 0 to modify these /etc/ files since on openshift, the dynamically-assigned user is always part of group 0.
-# Also see ./uid.sh for the usage of these permissions.
-RUN chmod g+w /etc/passwd && \
-    touch /etc/sub{g,u}id && \
-    chmod -v ug+rw /etc/sub{g,u}id
-
-COPY --chown=${USERNAME}:0 get-runner-release.sh ./
-RUN ./get-runner-release.sh
-RUN ./bin/installdependencies.sh
-
-# Set permissions so that we can allow the openshift-generated container user to access home.
-# https://docs.openshift.com/container-platform/3.3/creating_images/guidelines.html#openshift-container-platform-specific-guidelines
-RUN chown -R ${USERNAME}:0 /home/${USERNAME}/ && \
-    chgrp -R 0 /home/${USERNAME}/ && \
-    chmod -R g=u /home/${USERNAME}/
-
-COPY --chown=${USERNAME}:0 entrypoint.sh uid.sh register.sh get_github_app_token.sh ./
+ADD run.sh run.sh
+RUN chmod +x run.sh
 
 # OCP friendly
-USER $UID
-
-ENTRYPOINT ./entrypoint.sh
+USER 1001
+ENTRYPOINT ["./run.sh"]
