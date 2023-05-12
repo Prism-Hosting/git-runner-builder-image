@@ -28,4 +28,4 @@ RUN chmod +x run.sh
 
 # OCP friendly
 USER 1001
-ENTRYPOINT ["./run.sh"]
+ENTRYPOINT ["./run.sh", "--disableupdate"]
